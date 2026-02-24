@@ -43,9 +43,8 @@ object MkSession {
 
             val initFile: File = localBinDir().child("init-host")
 
-            // Always overwrite init scripts so app updates are applied immediately.
-            // Old behaviour (exists check) meant users were stuck on the old broken
-            // version forever until they cleared app data.
+            // Always refresh init scripts from assets so any app update
+            // (e.g. new sshd_config, new proot flags) takes effect immediately.
             initFile.createFileIfNot()
             initFile.writeText(assets.open("init-host.sh").bufferedReader().use { it.readText() })
             initFile.setExecutable(true, false)
