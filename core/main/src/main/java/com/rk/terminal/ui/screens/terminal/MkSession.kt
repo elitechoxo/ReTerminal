@@ -43,17 +43,17 @@ object MkSession {
 
             val initFile: File = localBinDir().child("init-host")
 
-            if (initFile.exists().not()){
-                initFile.createFileIfNot()
-                initFile.writeText(assets.open("init-host.sh").bufferedReader().use { it.readText() })
-            }
-
+            // Always overwrite init scripts so app updates are applied immediately.
+            // Old behaviour (exists check) meant users were stuck on the old broken
+            // version forever until they cleared app data.
+            initFile.createFileIfNot()
+            initFile.writeText(assets.open("init-host.sh").bufferedReader().use { it.readText() })
+            initFile.setExecutable(true, false)
 
             localBinDir().child("init").apply {
-                if (exists().not()){
-                    createFileIfNot()
-                    writeText(assets.open("init.sh").bufferedReader().use { it.readText() })
-                }
+                createFileIfNot()
+                writeText(assets.open("init.sh").bufferedReader().use { it.readText() })
+                setExecutable(true, false)
             }
 
 
