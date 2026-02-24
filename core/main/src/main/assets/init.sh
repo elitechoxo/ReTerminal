@@ -1,17 +1,16 @@
-set -e
+set -e  # Exit immediately on Failure
 
-export PATH=/bin:/sbin:/usr/bin:/usr/sbin:/usr/local/bin:/usr/local/sbin:/system/bin:/system/xbin
+export PATH=/bin:/sbin:/usr/bin:/usr/sbin:/usr/share/bin:/usr/share/sbin:/usr/local/bin:/usr/local/sbin:/system/bin:/system/xbin
 export HOME=/root
 
-# DNS safety net
 if [ ! -s /etc/resolv.conf ]; then
-    printf 'nameserver 8.8.8.8\nnameserver 8.8.4.4\n' > /etc/resolv.conf
+    echo "nameserver 8.8.8.8" > /etc/resolv.conf
 fi
 
-export PS1="\[\e[38;5;46m\]\u\[\033[39m\]@reterm \[\033[39m\]\w \[\033[0m\]\$ "
-export PIP_BREAK_SYSTEM_PACKAGES=1
 
-# Auto-install required packages (openssh is critical for SFTP)
+export PS1="\[\e[38;5;46m\]\u\[\033[39m\]@reterm \[\033[39m\]\w \[\033[0m\]\\$ "
+# shellcheck disable=SC2034
+export PIP_BREAK_SYSTEM_PACKAGES=1
 required_packages="bash gcompat glib nano openssh"
 missing_packages=""
 for pkg in $required_packages; do
@@ -20,34 +19,40 @@ for pkg in $required_packages; do
     fi
 done
 if [ -n "$missing_packages" ]; then
-    echo -e "\e[34;1m[*]\e[0m Installing:$missing_packages"
-    apk update -q && apk add -q $missing_packages
-    echo -e "\e[32;1m[+]\e[0m Done"
+    echo -e "\e[34;1m[*] \e[0mInstalling Important packages\e[0m"
+    apk update && apk upgrade
+    apk add $missing_packages
+    if [ $? -eq 0 ]; then
+        echo -e "\e[32;1m[+] \e[0mSuccessfully Installed\e[0m"
+    fi
+    echo -e "\e[34m[*] \e[0mUse \e[32mapk\e[0m to install new packages\e[0m"
 fi
 
-# Generate host keys (required for sshd to start)
+# Generate SSH host keys if missing (sshd refuses to start without them)
 if [ ! -f /etc/ssh/ssh_host_rsa_key ]; then
-    ssh-keygen -A -q 2>/dev/null
+    ssh-keygen -A 2>/dev/null || true
 fi
 
-# Set root password if locked (* or ! in shadow = locked = SFTP auth fails)
+# Unlock root if password is locked (* or ! = locked = SFTP password auth fails)
+# Default password: root  -- user can change with: passwd root
 if ! grep -q "^root:[^*!]" /etc/shadow 2>/dev/null; then
     echo "root:root" | chpasswd 2>/dev/null || true
 fi
 
-# Runtime dirs (race-condition safety, init-host.sh already creates them)
+# Ensure runtime dirs exist (init-host.sh also creates them before proot)
 mkdir -p /run/sshd /var/empty
 
-# Fix linker warning
-if [ ! -f /linkerconfig/ld.config.txt ]; then
-    mkdir -p /linkerconfig && touch /linkerconfig/ld.config.txt
+#fix linker warning
+if [[ ! -f /linkerconfig/ld.config.txt ]];then
+    mkdir -p /linkerconfig
+    touch /linkerconfig/ld.config.txt
 fi
 
 if [ "$#" -eq 0 ]; then
-    source /etc/profile 2>/dev/null || true
-    export PS1="\[\e[38;5;46m\]\u\[\033[39m\]@reterm \[\033[39m\]\w \[\033[0m\]\$ "
+    source /etc/profile
+    export PS1="\[\e[38;5;46m\]\u\[\033[39m\]@reterm \[\033[39m\]\w \[\033[0m\]\\$ "
     cd $HOME
-    exec /bin/bash 2>/dev/null || exec /bin/ash
+    /bin/ash
 else
     exec "$@"
 fi
